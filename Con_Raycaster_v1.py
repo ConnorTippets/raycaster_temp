@@ -46,6 +46,15 @@ def drawMap2D():
             glVertex2i(xo+mapS-1,yo+1)
             glEnd()
 
+def FixAng(a):
+    if a>359:
+        a-=360
+    if a<0:
+        a+=360
+    return a
+
+distance = lambda ax,ay,bx,by,ang: cos(degToRad(ang))*(bx-ax)-sin(degToRad(ang))*(by-ay)
+
 def drawPlayer():
     glColor3f(1,1,0)
     glPointSize(8)
@@ -59,66 +68,148 @@ def drawPlayer():
     glEnd()
 
 def drawRays3D():
-    r=None
-    mx=None
-    my=None
-    mp=None
-    dof=None
-    rx=None
-    ry=None
-    ra=None
-    xo=None
-    yo=None
-    ra=pa
-    for r in range(1):
+    global px, py, pa
+    glColor3f(0,1,1)
+    glBegin(GL_QUADS)
+    glVertex2i(526,  0)
+    glVertex2i(1006,  0)
+    glVertex2i(1006,160)
+    glVertex2i(526,160)
+    glEnd()
+    glColor3f(0,0,1)
+    glBegin(GL_QUADS)
+    glVertex2i(526,160)
+    glVertex2i(1006,160)
+    glVertex2i(1006,320)
+    glVertex2i(526,320)
+    glEnd()
+    
+    r,mx,my,mp,dof,side = None,None,None,None,None,None
+    vx,vy,rx,ry,ra,xo,yo,disV,disH = None,None,None,None,None,None,None,None,None
+    
+    ra=FixAng(pa+30)
+    
+    for r in range(60):
         dof=0
-        aTan=-1/tan(ra) if ra>0 or ra<0 else -1
-        if ra<180 and ra>0:
-            print('looking up')
-            ry = int(py)
-            ry = ry>>6
-            ry = ry<<6
-            ry-=0.0001
-            rx = py-ry
-            rx = rx*aTan
-            rx+=px
-            yo = -64
-            xo = -yo*aTan
-            print(rx, ry, yo, xo, 'looking up')
-        if ra>180 and ra<360:
-            print('looking down')
-            ry = int(py)
-            ry = ry>>6
-            ry = ry<<6
-            ry+= 64
-            rx = py-ry
-            rx = rx*aTan
-            rx+=px
-            yo = 64
-            xo = -yo*aTan
-        if ra==0 or 180:
-            rx=px
-            ry=py
-            dof=8
+        side=0
+        disV=100000
+        Tan=tan(degToRad(ra))
+        if cos(degToRad(ra))>0.001: #looking left
+            rx = px
+            rx = rx>>6
+            rx = int(rx)
+            rx = rx<<6
+            rx+=64
+            ry = (px-rx)*Tan+py
+            xo = 64
+            yo = -xo * Tan
+        elif cos(degToRad(ra))<-0.001: #looking right
+            rx = px
+            rx = rx>>6
+            rx = int(rx)
+            rx = rx<<6
+            rx-=0.0001
+            ry = (px-rx)*Tan+py
+            xo = -64
+            yo = -xo * Tan
+        else:
+            rx = px
+            ry = py
+            dof = 8
+        
         while dof<8:
             mx = int(rx)
             mx = mx>>6
             my = int(ry)
             my = my>>6
             mp=my*mapX+mx
-            if mp>0 and mp<mapX*mapY and map[mp]==1:
+            if mp>0 and mp<mapX*mapY and map[mp] == 1:
                 dof = 8
+                disV = cos(degToRad(ra))
+                disV = disV*(rx-px)
+                disV-=sin(degToRad(ra))*(ry-py)
             else:
                 rx+=xo
                 ry+=yo
                 dof+=1
-        glColor3f(0,1,0)
-        glLineWidth(1)
+        vx=rx
+        vy=ry
+        dof=0
+        disH=100000
+        Tan=1/(Tan+1)
+        if sin(degToRad(ra))>0.001: #looking up
+            ry = py
+            ry = ry>>6
+            ry = int(ry)
+            ry = ry<<6
+            ry-=0.0001
+            rx = (py-ry)*Tan+px
+            yo = -64
+            xo = -yo*Tan
+        elif sin(degToRad(ra))<-0.001: #looking down
+            ry = py
+            ry = ry>>6
+            ry = int(ry)
+            ry = ry<<6
+            ry+=64
+            rx = (py-ry)*Tan+px
+            yo = 64
+            xo = -yo*Tan
+        else:
+            rx=px
+            ry=py
+            dof=8
+        
+        while dof<8:
+            mx = int(rx)
+            mx = mx>>6
+            my = int(ry)
+            my = my>>6
+            mp = my*mapX+mx
+            if mp>0 and mp<mapX*mapY and map[mp]==1:
+                dof = 8
+                disH = cos(degToRad(ra))*(rx-px)
+                disH-=sin(degToRad(ra))*(ry-py)
+            else:
+                rx+=xo
+                ry+=yo
+                dof+=1
+        
+        hx=rx
+        hy=ry
+        glColor3f(0,0.8,0)
+        if disV<disH:
+            rx=vx
+            ry=vy
+            disH=disV
+            glColor3f(0,0.6,0)
+        else:
+            rx=hx
+            ry=hy
+            disV=disH
+            glColor3f(0,0.8,0)
+        glLineWidth(2)
         glBegin(GL_LINES)
+        px,py = int(px), int(py)
+        rx,ry = int(rx), int(ry)
         glVertex2i(px,py)
         glVertex2i(rx,ry)
-        print(px, py, rx, ry, pa, ra)
         glEnd()
+        
+        ca=FixAng(pa-ra)
+        disH=disH*cos(degToRad(ca))
+        lineH = int((mapS*320)/(disH))
+        if lineH>320:
+            lineH=320
+        lineOff = 160 - (lineH>>1)
+        
+        glLineWidth(8)
+        glBegin(GL_LINES)
+        glVertex2i(r*8+530,lineOff)
+        glVertex2i(r*8+530,lineOff+lineH)
+        glEnd()
+        
+        ra=FixAng(ra-1);
 
 def display():
     global px, py, pdx, pdy, pa
